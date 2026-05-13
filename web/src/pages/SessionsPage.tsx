@@ -1,5 +1,5 @@
-import { RefreshCw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { GripVertical, RefreshCw } from "lucide-react";
+import { type DragEvent, useEffect, useState } from "react";
 
 import {
   api,
@@ -12,6 +12,59 @@ import {
 import { MetricComparisonChart } from "../components/MetricComparisonChart";
 
 const carIndexes = Array.from({ length: 22 }, (_, index) => index);
+const chartOrderStorageKey = "f1-telemetry-session-chart-order";
+
+type MetricKey = keyof Pick<
+  TelemetrySample,
+  "speed_kph" | "throttle" | "brake" | "steer" | "engine_rpm" | "gear"
+>;
+
+type MetricConfig = {
+  id: string;
+  title: string;
+  metric: MetricKey;
+  formatter?: (value: number | null) => number | null;
+  unit?: string;
+};
+
+const metricConfigs: MetricConfig[] = [
+  { id: "speed", title: "Speed", metric: "speed_kph", unit: "kph" },
+  {
+    id: "throttle",
+    title: "Throttle",
+    metric: "throttle",
+    formatter: (value) => (value === null ? null : Math.round(value * 100)),
+    unit: "%",
+  },
+  {
+    id: "brake",
+    title: "Brake",
+    metric: "brake",
+    formatter: (value) => (value === null ? null : Math.round(value * 100)),
+    unit: "%",
+  },
+  { id: "steering", title: "Steering", metric: "steer" },
+  { id: "engine-rpm", title: "Engine RPM", metric: "engine_rpm" },
+  { id: "gear", title: "Gear", metric: "gear" },
+];
+
+const defaultMetricOrder = metricConfigs.map((metric) => metric.id);
+
+function loadMetricOrder() {
+  const stored = window.localStorage.getItem(chartOrderStorageKey);
+  if (!stored) return defaultMetricOrder;
+
+  try {
+    const parsed = JSON.parse(stored) as string[];
+    const known = parsed.filter((metricId) =>
+      metricConfigs.some((metric) => metric.id === metricId),
+    );
+    const missing = defaultMetricOrder.filter((metricId) => !known.includes(metricId));
+    return [...known, ...missing];
+  } catch {
+    return defaultMetricOrder;
+  }
+}
 
 export function SessionsPage() {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -27,6 +80,8 @@ export function SessionsPage() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [samples, setSamples] = useState<TelemetrySample[]>([]);
   const [compare, setCompare] = useState<TelemetrySample[]>([]);
+  const [metricOrder, setMetricOrder] = useState(loadMetricOrder);
+  const [draggedMetric, setDraggedMetric] = useState<string | null>(null);
 
   const driverLabel = (carIndex: number) => {
     const driver = drivers.find(
@@ -44,6 +99,28 @@ export function SessionsPage() {
     scopedDrivers.length > 0
       ? scopedDrivers.map((driver) => driver.car_index).sort((a, b) => a - b)
       : carIndexes;
+  const orderedMetrics = metricOrder
+    .map((metricId) => metricConfigs.find((metric) => metric.id === metricId))
+    .filter((metric): metric is MetricConfig => Boolean(metric));
+
+  const moveMetric = (sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+    setMetricOrder((current) => {
+      const next = [...current];
+      const sourceIndex = next.indexOf(sourceId);
+      const targetIndex = next.indexOf(targetId);
+      if (sourceIndex === -1 || targetIndex === -1) return current;
+      const [source] = next.splice(sourceIndex, 1);
+      next.splice(targetIndex, 0, source);
+      return next;
+    });
+  };
+
+  const handleChartDrop = (event: DragEvent, targetId: string) => {
+    event.preventDefault();
+    if (draggedMetric) moveMetric(draggedMetric, targetId);
+    setDraggedMetric(null);
+  };
 
   async function refresh() {
     const loaded = await api.sessions();
@@ -54,6 +131,10 @@ export function SessionsPage() {
   useEffect(() => {
     refresh();
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(chartOrderStorageKey, JSON.stringify(metricOrder));
+  }, [metricOrder]);
 
   useEffect(() => {
     if (!selected) return;
@@ -215,59 +296,42 @@ export function SessionsPage() {
           </div>
         </div>
         <div className="metric-chart-grid">
-          <MetricComparisonChart
-            title="Speed"
-            metric="speed_kph"
-            samples={samples}
-            comparison={compare}
-            primaryLabel={driverLabel(primaryCar)}
-            comparisonLabel={driverLabel(comparisonCar)}
-            unit="kph"
-          />
-          <MetricComparisonChart
-            title="Throttle"
-            metric="throttle"
-            samples={samples}
-            comparison={compare}
-            primaryLabel={driverLabel(primaryCar)}
-            comparisonLabel={driverLabel(comparisonCar)}
-            formatter={(value) => (value === null ? null : Math.round(value * 100))}
-            unit="%"
-          />
-          <MetricComparisonChart
-            title="Brake"
-            metric="brake"
-            samples={samples}
-            comparison={compare}
-            primaryLabel={driverLabel(primaryCar)}
-            comparisonLabel={driverLabel(comparisonCar)}
-            formatter={(value) => (value === null ? null : Math.round(value * 100))}
-            unit="%"
-          />
-          <MetricComparisonChart
-            title="Steering"
-            metric="steer"
-            samples={samples}
-            comparison={compare}
-            primaryLabel={driverLabel(primaryCar)}
-            comparisonLabel={driverLabel(comparisonCar)}
-          />
-          <MetricComparisonChart
-            title="Engine RPM"
-            metric="engine_rpm"
-            samples={samples}
-            comparison={compare}
-            primaryLabel={driverLabel(primaryCar)}
-            comparisonLabel={driverLabel(comparisonCar)}
-          />
-          <MetricComparisonChart
-            title="Gear"
-            metric="gear"
-            samples={samples}
-            comparison={compare}
-            primaryLabel={driverLabel(primaryCar)}
-            comparisonLabel={driverLabel(comparisonCar)}
-          />
+          {orderedMetrics.map((chart) => (
+            <div
+              className={
+                draggedMetric && draggedMetric !== chart.id
+                  ? "metric-chart-drop-target"
+                  : "metric-chart-drop-target idle"
+              }
+              key={chart.id}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => handleChartDrop(event, chart.id)}
+            >
+              <MetricComparisonChart
+                title={chart.title}
+                metric={chart.metric}
+                samples={samples}
+                comparison={compare}
+                primaryLabel={driverLabel(primaryCar)}
+                comparisonLabel={driverLabel(comparisonCar)}
+                formatter={chart.formatter}
+                headerAction={
+                  <button
+                    aria-label={`Move ${chart.title} chart`}
+                    className="drag-handle"
+                    draggable
+                    onDragEnd={() => setDraggedMetric(null)}
+                    onDragStart={() => setDraggedMetric(chart.id)}
+                    title="Drag to reorder chart"
+                    type="button"
+                  >
+                    <GripVertical size={18} />
+                  </button>
+                }
+                unit={chart.unit}
+              />
+            </div>
+          ))}
         </div>
       </main>
     </section>
