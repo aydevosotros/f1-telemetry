@@ -10,14 +10,10 @@ import {
   type TelemetrySample,
 } from "../api/client";
 import { MetricComparisonChart } from "../components/MetricComparisonChart";
+import type { MetricKey } from "../telemetryMetrics";
 
 const carIndexes = Array.from({ length: 22 }, (_, index) => index);
 const chartOrderStorageKey = "f1-telemetry-session-chart-order";
-
-type MetricKey = keyof Pick<
-  TelemetrySample,
-  "speed_kph" | "throttle" | "brake" | "steer" | "engine_rpm" | "gear"
->;
 
 type MetricConfig = {
   id: string;
@@ -51,10 +47,10 @@ const metricConfigs: MetricConfig[] = [
 const defaultMetricOrder = metricConfigs.map((metric) => metric.id);
 
 function loadMetricOrder() {
-  const stored = window.localStorage.getItem(chartOrderStorageKey);
-  if (!stored) return defaultMetricOrder;
-
   try {
+    const stored = window.localStorage.getItem(chartOrderStorageKey);
+    if (!stored) return defaultMetricOrder;
+
     const parsed = JSON.parse(stored) as string[];
     const known = parsed.filter((metricId) =>
       metricConfigs.some((metric) => metric.id === metricId),
@@ -63,6 +59,14 @@ function loadMetricOrder() {
     return [...known, ...missing];
   } catch {
     return defaultMetricOrder;
+  }
+}
+
+function saveMetricOrder(metricOrder: string[]) {
+  try {
+    window.localStorage.setItem(chartOrderStorageKey, JSON.stringify(metricOrder));
+  } catch {
+    // Persistence is optional; chart reordering should still work when storage is unavailable.
   }
 }
 
@@ -111,14 +115,22 @@ export function SessionsPage() {
       const targetIndex = next.indexOf(targetId);
       if (sourceIndex === -1 || targetIndex === -1) return current;
       const [source] = next.splice(sourceIndex, 1);
-      next.splice(targetIndex, 0, source);
+      const insertionIndex = sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
+      next.splice(insertionIndex, 0, source);
       return next;
     });
   };
 
+  const handleChartDragStart = (event: DragEvent, metricId: string) => {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", metricId);
+    setDraggedMetric(metricId);
+  };
+
   const handleChartDrop = (event: DragEvent, targetId: string) => {
     event.preventDefault();
-    if (draggedMetric) moveMetric(draggedMetric, targetId);
+    const sourceId = draggedMetric ?? event.dataTransfer.getData("text/plain");
+    if (sourceId) moveMetric(sourceId, targetId);
     setDraggedMetric(null);
   };
 
@@ -133,7 +145,7 @@ export function SessionsPage() {
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(chartOrderStorageKey, JSON.stringify(metricOrder));
+    saveMetricOrder(metricOrder);
   }, [metricOrder]);
 
   useEffect(() => {
@@ -321,7 +333,7 @@ export function SessionsPage() {
                     className="drag-handle"
                     draggable
                     onDragEnd={() => setDraggedMetric(null)}
-                    onDragStart={() => setDraggedMetric(chart.id)}
+                    onDragStart={(event) => handleChartDragStart(event, chart.id)}
                     title="Drag to reorder chart"
                     type="button"
                   >

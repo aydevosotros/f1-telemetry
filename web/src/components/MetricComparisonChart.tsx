@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   CartesianGrid,
   Legend,
@@ -8,14 +9,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { ReactNode } from "react";
 
 import type { TelemetrySample } from "../api/client";
-
-type MetricKey = keyof Pick<
-  TelemetrySample,
-  "speed_kph" | "throttle" | "brake" | "steer" | "engine_rpm" | "gear"
->;
+import type { MetricKey } from "../telemetryMetrics";
 
 type MetricComparisonChartProps = {
   title: string;
