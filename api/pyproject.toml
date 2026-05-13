@@ -10,7 +10,7 @@ dependencies = [
   "f1-packets==2025.1.1",
   "pydantic-settings>=2.4.0",
   "sqlalchemy[asyncio]>=2.0.32",
-  "uvicorn[standard]>=0.30.6",
+  "uvicorn>=0.30.6",
 ]
 
 [dependency-groups]
