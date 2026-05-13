@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   CartesianGrid,
   Legend,
@@ -10,11 +11,7 @@ import {
 } from "recharts";
 
 import type { TelemetrySample } from "../api/client";
-
-type MetricKey = keyof Pick<
-  TelemetrySample,
-  "speed_kph" | "throttle" | "brake" | "steer" | "engine_rpm" | "gear"
->;
+import type { MetricKey } from "../telemetryMetrics";
 
 type MetricComparisonChartProps = {
   title: string;
@@ -24,6 +21,7 @@ type MetricComparisonChartProps = {
   primaryLabel: string;
   comparisonLabel: string;
   formatter?: (value: number | null) => number | null;
+  headerAction?: ReactNode;
   unit?: string;
 };
 
@@ -35,6 +33,7 @@ export function MetricComparisonChart({
   primaryLabel,
   comparisonLabel,
   formatter = (value) => value,
+  headerAction,
   unit,
 }: MetricComparisonChartProps) {
   const startTime = samples[0]?.session_time ?? 0;
@@ -51,7 +50,10 @@ export function MetricComparisonChart({
   return (
     <section className="metric-chart">
       <div className="metric-chart-header">
-        <h2>{title}</h2>
+        <div className="metric-chart-title">
+          {headerAction}
+          <h2>{title}</h2>
+        </div>
         {unit ? <span>{unit}</span> : null}
       </div>
       <ResponsiveContainer width="100%" height={240}>

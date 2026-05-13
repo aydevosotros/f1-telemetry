@@ -232,6 +232,19 @@ p {
   gap: 16px;
 }
 
+.metric-chart-drop-target {
+  border-radius: 8px;
+  outline: 2px solid transparent;
+  outline-offset: 3px;
+  transition:
+    opacity 0.15s ease,
+    outline-color 0.15s ease;
+}
+
+.metric-chart-drop-target:not(.idle) {
+  outline-color: #bfdbfe;
+}
+
 .metric-chart {
   background: #ffffff;
   border: 1px solid #e5e7eb;
@@ -246,6 +259,13 @@ p {
   margin-bottom: 8px;
 }
 
+.metric-chart-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 .metric-chart-header h2 {
   margin: 0;
   font-size: 16px;
@@ -255,6 +275,31 @@ p {
   color: #6b7280;
   font-size: 13px;
   font-weight: 700;
+}
+
+.drag-handle {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #6b7280;
+  cursor: grab;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.drag-handle:hover,
+.drag-handle:focus-visible {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #111827;
+  outline: none;
 }
 
 .error-banner {
